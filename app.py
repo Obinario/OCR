@@ -22,18 +22,21 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Initialize the OCR API client
 try:
-    ocr_client = Client("markobinario/OCRapi")
+    # Set Hugging Face token for authentication
+    hf_token = "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"
+    ocr_client = Client("markobinario/OCRapi", hf_token=hf_token)
+    
     # Test the connection by checking if the API is accessible
     try:
         # Try to get API info to verify connection
         api_info = ocr_client.view_api()
         if api_info is not None:
             api_available = True
-            print(f"OCR API initialized successfully. Available endpoints: {list(api_info.keys())}")
+            print(f"OCR API initialized successfully with authentication. Available endpoints: {list(api_info.keys())}")
         else:
             # API info is None, but client was created successfully
             api_available = True
-            print("OCR API initialized successfully (API info not available, but client created)")
+            print("OCR API initialized successfully with authentication (API info not available, but client created)")
     except Exception as api_test_error:
         print(f"Warning: OCR API client initialized but connection test failed: {api_test_error}")
         # Still set as available since the client was created successfully
@@ -71,7 +74,7 @@ def process_pdf_with_ocr(file_path):
             print(f"[DEBUG] Calling ocr_client.predict with file: {file_path}")
             result = ocr_client.predict(
                 pdf_file=file_path,
-                api_name="/predict_1"  # Using the successful endpoint
+                api_name="/predict"  # Try the main endpoint instead
             )
             print(f"[DEBUG] OCR predict returned: {type(result)} with length: {len(result) if hasattr(result, '__len__') else 'N/A'}")
             return result
