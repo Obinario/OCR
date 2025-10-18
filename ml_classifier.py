@@ -46,41 +46,41 @@ class MLClassifier:
             vectorizer_path: Custom vectorizer path
         """
         try:
-            # Try original models first (better accuracy)
-            if not model_path:
-                self.clf = joblib.load('report_card_model.pkl')
-                self.vectorizer = joblib.load('vectorizer.pkl')
-                logger.info("Original ML model and vectorizer loaded successfully!")
-                self.model_loaded = True
-                return
-        except Exception as e:
-            logger.warning(f"Failed to load original models: {e}")
-        
-        try:
-            # Fallback to automated training models
+            # Try automated training models first
             if not model_path:
                 self.clf = joblib.load('models/auto_report_card_model.pkl')
                 self.vectorizer = joblib.load('models/auto_vectorizer.pkl')
-                logger.info("Automated ML model and vectorizer loaded successfully!")
+                logger.info("✅ Automated ML model and vectorizer loaded successfully!")
                 self.model_loaded = True
                 return
         except Exception as e:
             logger.warning(f"Failed to load automated models: {e}")
         
         try:
+            # Fallback to original models
+            if not model_path:
+                self.clf = joblib.load('report_card_model.pkl')
+                self.vectorizer = joblib.load('vectorizer.pkl')
+                logger.info("✅ Original ML model and vectorizer loaded successfully!")
+                self.model_loaded = True
+                return
+        except Exception as e:
+            logger.warning(f"Failed to load original models: {e}")
+        
+        try:
             # Try custom paths if provided
             if model_path and vectorizer_path:
                 self.clf = joblib.load(model_path)
                 self.vectorizer = joblib.load(vectorizer_path)
-                logger.info("Custom ML model and vectorizer loaded successfully!")
+                logger.info("✅ Custom ML model and vectorizer loaded successfully!")
                 self.model_loaded = True
                 return
         except Exception as e:
             logger.error(f"Failed to load custom models: {e}")
         
         # If all attempts fail
-        logger.error("Error loading ML model")
-        logger.info("Please run 'python auto_train.py' to train the model automatically.")
+        logger.error("❌ Error loading ML model")
+        logger.info("💡 Please run 'python auto_train.py' to train the model automatically.")
         self.model_loaded = False
     
     def is_model_available(self) -> bool:
