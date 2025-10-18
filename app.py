@@ -67,7 +67,7 @@ def run_with_timeout(func, timeout_seconds):
 
 
 def process_pdf_with_ocr(file_path):
-    """Process PDF file using the OCR API with timeout handling."""
+    """Process PDF file using the OCR API with timeout handling and ML classification."""
     try:
         if not api_available or not ocr_client:
             return None, "OCR API is not available. Please check your configuration or internet connection."
@@ -86,12 +86,40 @@ def process_pdf_with_ocr(file_path):
         detailed_results = result[1] if len(result) > 1 else "{}"
         processing_stats = result[2] if len(result) > 2 else ""
 
-        return {
+        # Prepare OCR results for ML classification
+        ocr_results = {
             'extracted_text': extracted_text,
             'detailed_results': detailed_results,
             'processing_stats': processing_stats,
             'success': True
-        }, None
+        }
+
+        # Add ML classification if available
+        if ml_available and ml_classifier and extracted_text:
+            try:
+                # Convert extracted text to format expected by ML classifier
+                texts_for_classification = [{'text': extracted_text, 'confidence': 100.0}]
+                
+                # Classify the document
+                classification = ml_classifier.classify_text(texts_for_classification)
+                ocr_results['classification'] = classification
+                
+                # If it's a report card, verify pass/fail status
+                if classification == "Report Card":
+                    status_info = ml_classifier.verify_report_card_status(texts_for_classification)
+                    ocr_results['status_info'] = status_info
+                else:
+                    ocr_results['status_info'] = {"status": "not_applicable", "message": "Not a report card"}
+                    
+            except Exception as e:
+                print(f"Warning: ML classification failed: {e}")
+                ocr_results['classification'] = "Classification Error"
+                ocr_results['status_info'] = {"status": "error", "message": f"Classification error: {str(e)}"}
+        else:
+            ocr_results['classification'] = "ML Not Available"
+            ocr_results['status_info'] = {"status": "unavailable", "message": "ML classification not available"}
+
+        return ocr_results, None
 
     except TimeoutError:
         return None, f"OCR processing timed out after {OCR_TIMEOUT} seconds. The PDF might be too large or complex."
@@ -147,34 +175,7 @@ def upload_file():
             flash(f'Error: {error}')
             return redirect(url_for('index'))
 
-        # Add ML classification and status verification if OCR was successful
-        ml_results = None
-        if result and result.get('success') and ml_available and ml_classifier:
-            try:
-                # Prepare text data for ML classification
-                extracted_text = result.get('extracted_text', '')
-                if extracted_text:
-                    # Format text for ML classifier (expects list of dicts with 'text' and 'confidence')
-                    text_data = [{'text': extracted_text, 'confidence': 1.0}]
-                    
-                    # Classify the document
-                    classification = ml_classifier.classify_text(text_data)
-                    
-                    # Verify report card status if it's classified as a report card
-                    status_verification = None
-                    if classification == "Report Card":
-                        status_verification = ml_classifier.verify_report_card_status(text_data)
-                    
-                    ml_results = {
-                        'classification': classification,
-                        'status_verification': status_verification,
-                        'model_info': ml_classifier.get_model_info()
-                    }
-            except Exception as e:
-                print(f"Error in ML processing: {e}")
-                ml_results = {'error': f'ML processing error: {str(e)}'}
-
-        return render_template('index.html', result=result, ml_results=ml_results, api_available=api_available, ml_available=ml_available)
+        return render_template('index.html', result=result, api_available=api_available, ml_available=ml_available)
 
     except Exception as e:
         flash(f'Error processing file: {str(e)}')
@@ -188,41 +189,8 @@ def health_check():
         'status': 'healthy',
         'api_available': api_available,
         'ml_available': ml_available,
-        'ml_model_info': ml_classifier.get_model_info() if ml_classifier else None,
         'timestamp': time.time()
     })
-
-
-@app.route('/classify', methods=['POST'])
-def classify_text():
-    """API endpoint to classify text using ML model."""
-    if not ml_available or not ml_classifier:
-        return jsonify({'error': 'ML classifier not available'}), 503
-    
-    try:
-        data = request.get_json()
-        if not data or 'text' not in data:
-            return jsonify({'error': 'Text data required'}), 400
-        
-        # Format text for ML classifier
-        text_data = [{'text': data['text'], 'confidence': 1.0}]
-        
-        # Classify the text
-        classification = ml_classifier.classify_text(text_data)
-        
-        # Verify report card status if it's classified as a report card
-        status_verification = None
-        if classification == "Report Card":
-            status_verification = ml_classifier.verify_report_card_status(text_data)
-        
-        return jsonify({
-            'classification': classification,
-            'status_verification': status_verification,
-            'model_info': ml_classifier.get_model_info()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': f'Classification error: {str(e)}'}), 500
 
 
 if __name__ == '__main__':
