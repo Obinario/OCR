@@ -7,6 +7,7 @@ import json
 import time
 import concurrent.futures
 from contextlib import contextmanager
+from ml_classifier import MLClassifier
 
 app = Flask(__name__)
 
@@ -35,6 +36,19 @@ except Exception as e:
     print(f"Warning: Could not initialize OCR API client: {e}")
     ocr_client = None
     api_available = False
+
+# Initialize ML Classifier
+try:
+    ml_classifier = MLClassifier()
+    ml_available = ml_classifier.is_model_available()
+    if ml_available:
+        print("ML Classifier initialized successfully!")
+    else:
+        print("ML Classifier initialized but model not available")
+except Exception as e:
+    print(f"Warning: Could not initialize ML Classifier: {e}")
+    ml_classifier = None
+    ml_available = False
 
 
 def allowed_file(filename):
@@ -88,7 +102,7 @@ def process_pdf_with_ocr(file_path):
 @app.route('/')
 def index():
     """Main page with file upload form."""
-    return render_template('index.html', api_available=api_available)
+    return render_template('index.html', api_available=api_available, ml_available=ml_available)
 
 
 @app.route('/upload', methods=['POST'])
@@ -133,7 +147,34 @@ def upload_file():
             flash(f'Error: {error}')
             return redirect(url_for('index'))
 
-        return render_template('index.html', result=result, api_available=api_available)
+        # Add ML classification and status verification if OCR was successful
+        ml_results = None
+        if result and result.get('success') and ml_available and ml_classifier:
+            try:
+                # Prepare text data for ML classification
+                extracted_text = result.get('extracted_text', '')
+                if extracted_text:
+                    # Format text for ML classifier (expects list of dicts with 'text' and 'confidence')
+                    text_data = [{'text': extracted_text, 'confidence': 1.0}]
+                    
+                    # Classify the document
+                    classification = ml_classifier.classify_text(text_data)
+                    
+                    # Verify report card status if it's classified as a report card
+                    status_verification = None
+                    if classification == "Report Card":
+                        status_verification = ml_classifier.verify_report_card_status(text_data)
+                    
+                    ml_results = {
+                        'classification': classification,
+                        'status_verification': status_verification,
+                        'model_info': ml_classifier.get_model_info()
+                    }
+            except Exception as e:
+                print(f"Error in ML processing: {e}")
+                ml_results = {'error': f'ML processing error: {str(e)}'}
+
+        return render_template('index.html', result=result, ml_results=ml_results, api_available=api_available, ml_available=ml_available)
 
     except Exception as e:
         flash(f'Error processing file: {str(e)}')
@@ -146,8 +187,42 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'api_available': api_available,
+        'ml_available': ml_available,
+        'ml_model_info': ml_classifier.get_model_info() if ml_classifier else None,
         'timestamp': time.time()
     })
+
+
+@app.route('/classify', methods=['POST'])
+def classify_text():
+    """API endpoint to classify text using ML model."""
+    if not ml_available or not ml_classifier:
+        return jsonify({'error': 'ML classifier not available'}), 503
+    
+    try:
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({'error': 'Text data required'}), 400
+        
+        # Format text for ML classifier
+        text_data = [{'text': data['text'], 'confidence': 1.0}]
+        
+        # Classify the text
+        classification = ml_classifier.classify_text(text_data)
+        
+        # Verify report card status if it's classified as a report card
+        status_verification = None
+        if classification == "Report Card":
+            status_verification = ml_classifier.verify_report_card_status(text_data)
+        
+        return jsonify({
+            'classification': classification,
+            'status_verification': status_verification,
+            'model_info': ml_classifier.get_model_info()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Classification error: {str(e)}'}), 500
 
 
 if __name__ == '__main__':
