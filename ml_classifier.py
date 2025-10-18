@@ -46,18 +46,7 @@ class MLClassifier:
             vectorizer_path: Custom vectorizer path
         """
         try:
-            # Try automated training models first
-            if not model_path:
-                self.clf = joblib.load('models/auto_report_card_model.pkl')
-                self.vectorizer = joblib.load('models/auto_vectorizer.pkl')
-                logger.info("Automated ML model and vectorizer loaded successfully!")
-                self.model_loaded = True
-                return
-        except Exception as e:
-            logger.warning(f"Failed to load automated models: {e}")
-        
-        try:
-            # Fallback to original models
+            # Try original models first (better accuracy)
             if not model_path:
                 self.clf = joblib.load('report_card_model.pkl')
                 self.vectorizer = joblib.load('vectorizer.pkl')
@@ -66,6 +55,17 @@ class MLClassifier:
                 return
         except Exception as e:
             logger.warning(f"Failed to load original models: {e}")
+        
+        try:
+            # Fallback to automated training models
+            if not model_path:
+                self.clf = joblib.load('models/auto_report_card_model.pkl')
+                self.vectorizer = joblib.load('models/auto_vectorizer.pkl')
+                logger.info("Automated ML model and vectorizer loaded successfully!")
+                self.model_loaded = True
+                return
+        except Exception as e:
+            logger.warning(f"Failed to load automated models: {e}")
         
         try:
             # Try custom paths if provided
