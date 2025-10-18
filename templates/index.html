@@ -63,6 +63,33 @@
                 </div>
             </div>
 
+            <!-- ML Classification Results -->
+            {% if result.prediction %}
+            <div class="result-card">
+                <h3><i class="fas fa-brain"></i> Document Classification</h3>
+                <div class="classification-output">
+                    <div class="classification-item">
+                        <strong>Document Type:</strong> 
+                        <span class="prediction-badge {% if result.is_report_card %}report-card{% else %}not-report-card{% endif %}">
+                            {{ result.prediction }}
+                        </span>
+                    </div>
+                    
+                    {% if result.is_report_card and result.status_info %}
+                    <div class="classification-item">
+                        <strong>Status:</strong> 
+                        <span class="status-badge {% if result.has_failed_remarks %}failed{% else %}passed{% endif %}">
+                            {% if result.has_failed_remarks %}Failed{% else %}Passed{% endif %}
+                        </span>
+                    </div>
+                    <div class="classification-item">
+                        <strong>Details:</strong> {{ result.status_info.message }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Detailed Results -->
             <div class="result-card">
                 <h3><i class="fas fa-code"></i> Detailed OCR Results (JSON)</h3>
@@ -81,44 +108,6 @@
                     <pre>{{ result.processing_stats }}</pre>
                 </div>
             </div>
-
-            <!-- ML Classification Results -->
-            {% if result.classification %}
-            <div class="result-card">
-                <h3><i class="fas fa-brain"></i> Document Classification</h3>
-                <div class="classification-output">
-                    <div class="classification-result">
-                        <span class="classification-label">Document Type:</span>
-                        <span class="classification-value {{ 'report-card' if result.classification == 'Report Card' else 'not-report-card' }}">
-                            {{ result.classification }}
-                        </span>
-                    </div>
-                    
-                    {% if result.status_info %}
-                    <div class="status-result">
-                        <span class="status-label">Status:</span>
-                        <span class="status-value {{ result.status_info.status }}">
-                            {% if result.status_info.status == 'failed' %}
-                                <i class="fas fa-times-circle"></i> Failed
-                            {% elif result.status_info.status == 'passed' %}
-                                <i class="fas fa-check-circle"></i> Passed
-                            {% elif result.status_info.status == 'not_applicable' %}
-                                <i class="fas fa-info-circle"></i> Not Applicable
-                            {% else %}
-                                <i class="fas fa-question-circle"></i> {{ result.status_info.status|title }}
-                            {% endif %}
-                        </span>
-                    </div>
-                    
-                    {% if result.status_info.message %}
-                    <div class="status-message">
-                        <p>{{ result.status_info.message }}</p>
-                    </div>
-                    {% endif %}
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
         </div>
         {% endif %}
 
@@ -133,18 +122,6 @@
                 <div class="status-badge error">
                     <i class="fas fa-exclamation-triangle"></i>
                     <span>OCR API Unavailable</span>
-                </div>
-            {% endif %}
-            
-            {% if ml_available %}
-                <div class="status-badge success">
-                    <i class="fas fa-brain"></i>
-                    <span>ML Classification Available</span>
-                </div>
-            {% else %}
-                <div class="status-badge warning">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>ML Classification Unavailable</span>
                 </div>
             {% endif %}
         </div>
