@@ -1,30 +1,25 @@
 #!/usr/bin/env python3
 """
-Automated OCR Training System
-Automatically collects OCR data and trains the classification model
+Automated ML Training System for API-based OCR
+Automatically collects training data from text files and trains the classification model
 """
 
 import os
 import json
-import cv2
-import numpy as np
 import joblib
 from datetime import datetime
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
-from paddleocr import PaddleOCR
 
 class AutoTrainer:
     def __init__(self):
-        """Initialize the automated trainer"""
-        self.ocr = None
+        """Initialize the automated trainer for API-based OCR"""
         self.data_file = "auto_training_data.json"
         self.model_file = "auto_report_card_model.pkl"
         self.vectorizer_file = "auto_vectorizer.pkl"
         self.setup_directories()
-        self.initialize_ocr()
         
     def setup_directories(self):
         """Create necessary directories"""
@@ -32,97 +27,16 @@ class AutoTrainer:
             os.makedirs("training_images")
         if not os.path.exists("models"):
             os.makedirs("models")
-            
-    def initialize_ocr(self):
-        """Initialize PaddleOCR"""
-        try:
-            self.ocr = PaddleOCR(lang='en', use_textline_orientation=False)
-            print("PaddleOCR initialized successfully!")
-        except Exception as e:
-            print(f"Error initializing PaddleOCR: {e}")
-            self.ocr = None
     
-    def scan_image(self, image_path):
-        """Scan image and extract OCR text"""
-        if not self.ocr:
+    def load_text_file(self, file_path):
+        """Load text from a file"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read().strip()
+            return text if text else None
+        except Exception as e:
+            print(f"❌ Error reading text file {file_path}: {e}")
             return None
-            
-        try:
-            image = cv2.imread(image_path)
-            if image is None:
-                return None
-                
-            # Add padding and preprocess
-            padded_image = self.add_padding(image)
-            processed_image = self.preprocess_image(padded_image)
-            
-            # Extract text using OCR
-            result = self.ocr.ocr(padded_image)
-            
-            if not result or not result[0] or len(result[0]) == 0:
-                return None
-                
-            # Process OCR results
-            extracted_texts = []
-            if isinstance(result[0], dict):  # New format
-                if 'rec_texts' in result[0] and 'rec_scores' in result[0]:
-                    texts = result[0]['rec_texts']
-                    scores = result[0]['rec_scores']
-                    for i, (text, score) in enumerate(zip(texts, scores)):
-                        extracted_texts.append({
-                            'text': text,
-                            'confidence': round(score * 100, 2)
-                        })
-            elif isinstance(result[0], list):  # Old format
-                for line in result[0]:
-                    if line and len(line) >= 2 and len(line[1]) >= 2:
-                        text = line[1][0]
-                        confidence = line[1][1]
-                        extracted_texts.append({
-                            'text': text,
-                            'confidence': round(confidence * 100, 2)
-                        })
-            
-            # Merge all text
-            full_text = " ".join([item['text'] for item in extracted_texts])
-            return full_text
-            
-        except Exception as e:
-            print(f"❌ Error scanning image: {e}")
-            return None
-    
-    def add_padding(self, image, top=40, bottom=150, left=40, right=40, color=(255, 255, 255)):
-        """Add padding around the image"""
-        padded = cv2.copyMakeBorder(
-            image, top, bottom, left, right,
-            cv2.BORDER_CONSTANT, value=color
-        )
-        return padded
-    
-    def preprocess_image(self, image):
-        """Preprocess image for better OCR"""
-        try:
-            if len(image.shape) == 3:
-                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            else:
-                gray = image.copy()
-            
-            clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-            enhanced = clahe.apply(gray)
-            
-            binary = cv2.adaptiveThreshold(
-                enhanced, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                cv2.THRESH_BINARY, 11, 2
-            )
-            
-            kernel = np.ones((1, 1), np.uint8)
-            cleaned = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
-            
-            processed_image = cv2.cvtColor(cleaned, cv2.COLOR_GRAY2BGR)
-            return processed_image
-            
-        except Exception as e:
-            return image
     
     def auto_classify_text(self, text):
         """Automatically classify text based on keywords"""
@@ -163,45 +77,38 @@ class AutoTrainer:
                 return 0, "Not Report Card"
     
     def collect_training_data(self, data_directory="training_images"):
-        """Automatically collect training data from images and text files"""
-        print("Collecting training data automatically...")
+        """Automatically collect training data from text files (API-based OCR)"""
+        print("Collecting training data from text files...")
         
         if not os.path.exists(data_directory):
             print(f"Directory not found: {data_directory}")
             return []
         
-        # Find all image and text files
-        image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif'}
+        # Find all text files
         text_extensions = {'.txt'}
-        
-        image_files = []
         text_files = []
         
         for root, dirs, files in os.walk(data_directory):
             for file in files:
                 file_path = os.path.join(root, file)
-                if any(file.lower().endswith(ext) for ext in image_extensions):
-                    image_files.append(file_path)
-                elif any(file.lower().endswith(ext) for ext in text_extensions):
+                if any(file.lower().endswith(ext) for ext in text_extensions):
                     text_files.append(file_path)
         
-        total_files = len(image_files) + len(text_files)
-        if total_files == 0:
-            print(f"No image or text files found in {data_directory}")
+        if len(text_files) == 0:
+            print(f"No text files found in {data_directory}")
             return []
         
-        print(f"Found {len(image_files)} images and {len(text_files)} text files")
+        print(f"Found {len(text_files)} text files")
         
         training_data = []
         processed_count = 0
         
-        # Process text files first (faster)
+        # Process text files
         for i, text_path in enumerate(text_files):
             print(f"Processing text file {i+1}/{len(text_files)}: {os.path.basename(text_path)}")
             
             try:
-                with open(text_path, 'r', encoding='utf-8') as f:
-                    text = f.read().strip()
+                text = self.load_text_file(text_path)
                 
                 if text and len(text) > 10:
                     # Auto-classify
@@ -216,25 +123,7 @@ class AutoTrainer:
             except Exception as e:
                 print(f"Error reading text file: {e}")
         
-        # Process image files
-        for i, image_path in enumerate(image_files):
-            print(f"Processing image {i+1}/{len(image_files)}: {os.path.basename(image_path)}")
-            
-            # Scan image
-            text = self.scan_image(image_path)
-            
-            if text and len(text.strip()) > 10:  # Only use if we got meaningful text
-                # Auto-classify
-                label, label_text = self.auto_classify_text(text)
-                
-                training_data.append((text, label))
-                processed_count += 1
-                
-                print(f"Extracted text ({len(text)} chars) -> {label_text}")
-            else:
-                print(f"No meaningful text extracted")
-        
-        print(f"\nCollection complete: {processed_count}/{total_files} files processed")
+        print(f"\nCollection complete: {processed_count}/{len(text_files)} files processed")
         return training_data
     
     def add_hardcoded_examples(self):
@@ -350,47 +239,10 @@ class AutoTrainer:
             print(f"Test {i+1}: {result} (Confidence: {confidence:.1f}%)")
             print(f"  Text: {text[:60]}...")
     
-    def should_retrain(self, images_directory="training_images"):
-        """Check if retraining is needed based on file timestamps"""
-        try:
-            # Check if models exist
-            model_path = "models/auto_report_card_model.pkl"
-            vectorizer_path = "models/auto_vectorizer.pkl"
-            
-            if not os.path.exists(model_path) or not os.path.exists(vectorizer_path):
-                print("Models don't exist, retraining needed")
-                return True
-            
-            # Get model modification time
-            model_time = os.path.getmtime(model_path)
-            
-            # Check if any training files are newer than the model
-            if os.path.exists(images_directory):
-                for root, dirs, files in os.walk(images_directory):
-                    for file in files:
-                        if any(file.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.txt']):
-                            file_path = os.path.join(root, file)
-                            file_time = os.path.getmtime(file_path)
-                            if file_time > model_time:
-                                print(f"New training file found: {file}, retraining needed")
-                                return True
-            
-            print("No new training data found, using existing models")
-            return False
-            
-        except Exception as e:
-            print(f"Error checking retrain status: {e}")
-            return True  # Retrain if we can't determine status
-
-    def auto_train(self, images_directory="training_images", force_retrain=False):
-        """Complete automated training process with smart retraining"""
+    def auto_train(self, images_directory="training_images"):
+        """Complete automated training process"""
         print("Automated OCR Training System")
         print("=" * 50)
-        
-        # Check if retraining is needed (unless forced)
-        if not force_retrain and not self.should_retrain(images_directory):
-            print("Using existing models (no retraining needed)")
-            return True
         
         # Step 1: Collect training data
         training_data = self.collect_training_data(images_directory)
@@ -415,10 +267,10 @@ def main():
     """Main function"""
     trainer = AutoTrainer()
     
-    print("Automated OCR Training System")
+    print("Automated ML Training System for API-based OCR")
     print("=" * 50)
     print("This system will:")
-    print("1. Scan images in the 'training_images' directory")
+    print("1. Load text files from the 'training_images' directory")
     print("2. Automatically classify them as Report Card or Not Report Card")
     print("3. Train a machine learning model")
     print("4. Save the trained model for use in your Flask app")
@@ -428,34 +280,34 @@ def main():
     if not os.path.exists("training_images"):
         print("Creating training_images directory...")
         os.makedirs("training_images")
-        print("Please add your document images to the 'training_images' directory")
-        print("   - Report cards, progress reports, etc.")
-        print("   - Menus, invoices, articles, etc.")
+        print("Please add your document text files to the 'training_images' directory")
+        print("   - Report cards, progress reports, etc. (as .txt files)")
+        print("   - Menus, invoices, articles, etc. (as .txt files)")
         print("   - Then run this script again")
         return
     
-    # Check if there are images or text files
+    # Check if there are text files
     files_found = []
     for root, dirs, files in os.walk("training_images"):
         for file in files:
-            if any(file.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.txt']):
+            if any(file.lower().endswith(ext) for ext in ['.txt']):
                 files_found.append(os.path.join(root, file))
     
     if not files_found:
-        print("No images or text files found in training_images directory")
-        print("Please add document images or text files to the 'training_images' directory")
+        print("No text files found in training_images directory")
+        print("Please add document text files to the 'training_images' directory")
         return
     
-    print(f"Found {len(files_found)} files in training_images directory")
+    print(f"Found {len(files_found)} text files in training_images directory")
     
     # Start automated training
     success = trainer.auto_train()
     
     if success:
         print(f"\nNext steps:")
-        print(f"1. Update app.py to load models from 'models/' directory")
+        print(f"1. The model is automatically loaded by app1.py")
         print(f"2. Test your Flask app with the new model")
-        print(f"3. Add more images to training_images/ for better accuracy")
+        print(f"3. Add more text files to training_images/ for better accuracy")
 
 if __name__ == "__main__":
     main()
