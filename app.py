@@ -37,31 +37,74 @@ except Exception as e:
     ocr_client = None
     api_available = False
 
+# Initialize ML Classifier with Auto-Training
+def initialize_ml_classifier():
+    """Initialize ML classifier with auto-training fallback"""
+    try:
+        ml_classifier = MLClassifier()
+        ml_available = ml_classifier.is_model_available()
+        
+        if ml_available:
+            print("ML Classifier initialized successfully!")
+            return ml_classifier, ml_available
+        else:
+            print("ML Classifier initialized but model not available")
+            return None, False
+            
+    except Exception as e:
+        print(f"Warning: Could not initialize ML Classifier: {e}")
+        return None, False
+
+def run_auto_training():
+    """Run auto-training and return new classifier"""
+    try:
+        print("Running auto-training...")
+        from auto_train import AutoTrainer
+        trainer = AutoTrainer()
+        
+        if trainer.auto_train():
+            print("Auto-training completed! Creating new ML classifier...")
+            
+            # Copy trained models to root directory
+            import shutil
+            try:
+                shutil.copy('models/auto_report_card_model.pkl', 'report_card_model.pkl')
+                shutil.copy('models/auto_vectorizer.pkl', 'vectorizer.pkl')
+                print("Models copied to root directory")
+            except Exception as copy_error:
+                print(f"Warning: Could not copy models: {copy_error}")
+            
+            # Create new classifier
+            ml_classifier = MLClassifier()
+            ml_available = ml_classifier.is_model_available()
+            
+            if ml_available:
+                print("ML Classifier initialized successfully after auto-training!")
+                return ml_classifier, ml_available
+            else:
+                print("ML Classifier still not available after auto-training")
+                return None, False
+        else:
+            print("Auto-training failed")
+            return None, False
+            
+    except Exception as train_error:
+        print(f"Auto-training failed: {train_error}")
+        return None, False
+
 # Initialize ML Classifier
-try:
-    ml_classifier = MLClassifier()
-    ml_available = ml_classifier.is_model_available()
-    if ml_available:
-        print("ML Classifier initialized successfully!")
-    else:
-        print("ML Classifier initialized but model not available")
-        # Try to auto-train if models are missing
-        try:
-            print("Attempting to auto-train models...")
-            from auto_train import AutoTrainer
-            trainer = AutoTrainer()
-            if trainer.auto_train():
-                print("Auto-training completed! Reloading ML classifier...")
-                ml_classifier = MLClassifier()
-                ml_available = ml_classifier.is_model_available()
-                if ml_available:
-                    print("ML Classifier initialized successfully after auto-training!")
-        except Exception as train_error:
-            print(f"Auto-training failed: {train_error}")
-except Exception as e:
-    print(f"Warning: Could not initialize ML Classifier: {e}")
+print("Initializing ML Classifier...")
+ml_classifier, ml_available = initialize_ml_classifier()
+
+# If not available, run auto-training
+if not ml_available:
+    print("ML models not available, running auto-training...")
+    ml_classifier, ml_available = run_auto_training()
+
+# Final fallback
+if not ml_available:
+    print("ML Classifier not available after all attempts")
     ml_classifier = None
-    ml_available = False
 
 
 def allowed_file(filename):
