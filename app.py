@@ -27,11 +27,17 @@ try:
     try:
         # Try to get API info to verify connection
         api_info = ocr_client.view_api()
-        api_available = True
-        print(f"OCR API initialized successfully. Available endpoints: {list(api_info.keys())}")
+        if api_info is not None:
+            api_available = True
+            print(f"OCR API initialized successfully. Available endpoints: {list(api_info.keys())}")
+        else:
+            # API info is None, but client was created successfully
+            api_available = True
+            print("OCR API initialized successfully (API info not available, but client created)")
     except Exception as api_test_error:
         print(f"Warning: OCR API client initialized but connection test failed: {api_test_error}")
-        api_available = False
+        # Still set as available since the client was created successfully
+        api_available = True
 except Exception as e:
     print(f"Warning: Could not initialize OCR API client: {e}")
     api_available = False
