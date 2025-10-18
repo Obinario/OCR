@@ -62,7 +62,7 @@ def run_auto_training():
         from auto_train import AutoTrainer
         trainer = AutoTrainer()
         
-        if trainer.auto_train():
+        if trainer.auto_train(force_retrain=True):
             print("Auto-training completed! Creating new ML classifier...")
             
             # Copy trained models to root directory
@@ -92,14 +92,17 @@ def run_auto_training():
         print(f"Auto-training failed: {train_error}")
         return None, False
 
-# Initialize ML Classifier
+# Initialize ML Classifier with Continuous Auto-Training
 print("Initializing ML Classifier...")
-ml_classifier, ml_available = initialize_ml_classifier()
 
-# If not available, run auto-training
+# Always run auto-training to improve accuracy
+print("Running auto-training to improve model accuracy...")
+ml_classifier, ml_available = run_auto_training()
+
+# If auto-training failed, try to load existing models
 if not ml_available:
-    print("ML models not available, running auto-training...")
-    ml_classifier, ml_available = run_auto_training()
+    print("Auto-training failed, trying to load existing models...")
+    ml_classifier, ml_available = initialize_ml_classifier()
 
 # Final fallback
 if not ml_available:
