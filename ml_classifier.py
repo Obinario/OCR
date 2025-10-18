@@ -4,10 +4,8 @@ This module handles all machine learning operations for document classification.
 """
 
 import joblib
-from typing import List, Dict, Optional, Any, Union
+from typing import List, Dict, Optional, Any
 import logging
-import os
-import sys
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +22,7 @@ class MLClassifier:
     - Report card status verification (pass/fail analysis)
     """
     
-    def __init__(self, model_path: Optional[str] = None, vectorizer_path: Optional[str] = None):
+    def __init__(self, model_path: str = None, vectorizer_path: str = None):
         """
         Initialize the ML classifier with model and vectorizer.
         
@@ -39,7 +37,7 @@ class MLClassifier:
         # Try to load models with fallback paths
         self._load_models(model_path, vectorizer_path)
     
-    def _load_models(self, model_path: Optional[str] = None, vectorizer_path: Optional[str] = None) -> None:
+    def _load_models(self, model_path: str = None, vectorizer_path: str = None) -> None:
         """
         Load ML model and vectorizer with fallback paths.
         
@@ -50,48 +48,33 @@ class MLClassifier:
         try:
             # Try automated training models first
             if not model_path:
-                auto_model_path = os.path.join('models', 'auto_report_card_model.pkl')
-                auto_vectorizer_path = os.path.join('models', 'auto_vectorizer.pkl')
-                
-                if os.path.exists(auto_model_path) and os.path.exists(auto_vectorizer_path):
-                    self.clf = joblib.load(auto_model_path)
-                    self.vectorizer = joblib.load(auto_vectorizer_path)
-                    logger.info("Automated ML model and vectorizer loaded successfully!")
-                    self.model_loaded = True
-                    return
-                else:
-                    logger.warning("Automated model files not found")
+                self.clf = joblib.load('models/auto_report_card_model.pkl')
+                self.vectorizer = joblib.load('models/auto_vectorizer.pkl')
+                logger.info("Automated ML model and vectorizer loaded successfully!")
+                self.model_loaded = True
+                return
         except Exception as e:
             logger.warning(f"Failed to load automated models: {e}")
         
         try:
             # Fallback to original models
             if not model_path:
-                original_model_path = 'report_card_model.pkl'
-                original_vectorizer_path = 'vectorizer.pkl'
-                
-                if os.path.exists(original_model_path) and os.path.exists(original_vectorizer_path):
-                    self.clf = joblib.load(original_model_path)
-                    self.vectorizer = joblib.load(original_vectorizer_path)
-                    logger.info("Original ML model and vectorizer loaded successfully!")
-                    self.model_loaded = True
-                    return
-                else:
-                    logger.warning("Original model files not found")
+                self.clf = joblib.load('report_card_model.pkl')
+                self.vectorizer = joblib.load('vectorizer.pkl')
+                logger.info("Original ML model and vectorizer loaded successfully!")
+                self.model_loaded = True
+                return
         except Exception as e:
             logger.warning(f"Failed to load original models: {e}")
         
         try:
             # Try custom paths if provided
             if model_path and vectorizer_path:
-                if os.path.exists(model_path) and os.path.exists(vectorizer_path):
-                    self.clf = joblib.load(model_path)
-                    self.vectorizer = joblib.load(vectorizer_path)
-                    logger.info("Custom ML model and vectorizer loaded successfully!")
-                    self.model_loaded = True
-                    return
-                else:
-                    logger.error(f"Custom model files not found: {model_path}, {vectorizer_path}")
+                self.clf = joblib.load(model_path)
+                self.vectorizer = joblib.load(vectorizer_path)
+                logger.info("Custom ML model and vectorizer loaded successfully!")
+                self.model_loaded = True
+                return
         except Exception as e:
             logger.error(f"Failed to load custom models: {e}")
         
