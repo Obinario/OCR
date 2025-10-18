@@ -45,6 +45,19 @@ try:
         print("ML Classifier initialized successfully!")
     else:
         print("ML Classifier initialized but model not available")
+        # Try to auto-train if models are missing
+        try:
+            print("Attempting to auto-train models...")
+            from auto_train import AutoTrainer
+            trainer = AutoTrainer()
+            if trainer.auto_train():
+                print("Auto-training completed! Reloading ML classifier...")
+                ml_classifier = MLClassifier()
+                ml_available = ml_classifier.is_model_available()
+                if ml_available:
+                    print("ML Classifier initialized successfully after auto-training!")
+        except Exception as train_error:
+            print(f"Auto-training failed: {train_error}")
 except Exception as e:
     print(f"Warning: Could not initialize ML Classifier: {e}")
     ml_classifier = None
