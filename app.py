@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, flash, redirect, url
 from werkzeug.utils import secure_filename
 import os
 import tempfile
-from gradio_client import Client, handle_file
+from gradio_client import Client
 import json
 import time
 import concurrent.futures
@@ -50,7 +50,7 @@ def process_pdf_with_ocr(file_path):
         # Define the OCR processing function
         def ocr_process():
             return ocr_client.predict(
-                pdf_file=handle_file(file_path),
+                pdf_file=file_path,
                 api_name="/predict_1"  # Using the successful endpoint
             )
         
