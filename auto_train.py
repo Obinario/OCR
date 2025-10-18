@@ -350,10 +350,47 @@ class AutoTrainer:
             print(f"Test {i+1}: {result} (Confidence: {confidence:.1f}%)")
             print(f"  Text: {text[:60]}...")
     
-    def auto_train(self, images_directory="training_images"):
-        """Complete automated training process"""
+    def should_retrain(self, images_directory="training_images"):
+        """Check if retraining is needed based on file timestamps"""
+        try:
+            # Check if models exist
+            model_path = "models/auto_report_card_model.pkl"
+            vectorizer_path = "models/auto_vectorizer.pkl"
+            
+            if not os.path.exists(model_path) or not os.path.exists(vectorizer_path):
+                print("Models don't exist, retraining needed")
+                return True
+            
+            # Get model modification time
+            model_time = os.path.getmtime(model_path)
+            
+            # Check if any training files are newer than the model
+            if os.path.exists(images_directory):
+                for root, dirs, files in os.walk(images_directory):
+                    for file in files:
+                        if any(file.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif', '.txt']):
+                            file_path = os.path.join(root, file)
+                            file_time = os.path.getmtime(file_path)
+                            if file_time > model_time:
+                                print(f"New training file found: {file}, retraining needed")
+                                return True
+            
+            print("No new training data found, using existing models")
+            return False
+            
+        except Exception as e:
+            print(f"Error checking retrain status: {e}")
+            return True  # Retrain if we can't determine status
+
+    def auto_train(self, images_directory="training_images", force_retrain=False):
+        """Complete automated training process with smart retraining"""
         print("Automated OCR Training System")
         print("=" * 50)
+        
+        # Check if retraining is needed (unless forced)
+        if not force_retrain and not self.should_retrain(images_directory):
+            print("Using existing models (no retraining needed)")
+            return True
         
         # Step 1: Collect training data
         training_data = self.collect_training_data(images_directory)
