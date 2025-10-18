@@ -298,95 +298,6 @@ body {
     border: 1px solid #f5c6cb;
 }
 
-.status-badge.warning {
-    background: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeaa7;
-}
-
-/* Classification results */
-.classification-output {
-    padding: 20px;
-}
-
-.classification-result,
-.status-result {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-    padding: 15px;
-    border-radius: 8px;
-    background: #f8f9fa;
-}
-
-.classification-label,
-.status-label {
-    font-weight: 600;
-    color: #495057;
-    margin-right: 15px;
-    min-width: 120px;
-}
-
-.classification-value,
-.status-value {
-    font-weight: 600;
-    padding: 8px 15px;
-    border-radius: 20px;
-    font-size: 0.9rem;
-}
-
-.classification-value.report-card {
-    background: #d1ecf1;
-    color: #0c5460;
-    border: 1px solid #bee5eb;
-}
-
-.classification-value.not-report-card {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-}
-
-.status-value.failed {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-}
-
-.status-value.passed {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
-
-.status-value.not_applicable {
-    background: #d1ecf1;
-    color: #0c5460;
-    border: 1px solid #bee5eb;
-}
-
-.status-value.unknown,
-.status-value.error,
-.status-value.unavailable {
-    background: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeaa7;
-}
-
-.status-message {
-    margin-top: 10px;
-    padding: 10px 15px;
-    background: #e9ecef;
-    border-radius: 5px;
-    border-left: 4px solid #667eea;
-}
-
-.status-message p {
-    margin: 0;
-    color: #495057;
-    font-style: italic;
-}
-
 /* Flash messages */
 .flash-messages {
     margin-bottom: 30px;
@@ -451,6 +362,65 @@ body {
     .file-text {
         font-size: 1.1rem;
     }
+}
+
+/* ML Classification Results */
+.classification-output {
+    padding: 20px;
+}
+
+.classification-item {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.classification-item strong {
+    min-width: 120px;
+    color: #495057;
+}
+
+.prediction-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.prediction-badge.report-card {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.prediction-badge.not-report-card {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-badge.passed {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-badge.failed {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
 }
 
 /* Animation for smooth transitions */
