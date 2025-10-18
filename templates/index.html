@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF OCR Text Extractor</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-file-pdf"></i> PDF OCR Text Extractor</h1>
+            <p>Extract text from PDF files using advanced OCR technology</p>
+        </header>
+
+        <div class="upload-section">
+            <form id="uploadForm" method="POST" action="/upload" enctype="multipart/form-data" class="upload-form">
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" name="file" accept=".pdf" required>
+                    <label for="fileInput" class="file-input-label">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span class="file-text">Choose PDF File</span>
+                        <span class="file-info">or drag and drop here</span>
+                    </label>
+                </div>
+                
+                <div class="upload-info">
+                    <p><i class="fas fa-info-circle"></i> Maximum file size: 16MB</p>
+                    <p><i class="fas fa-file-pdf"></i> Only PDF files are supported</p>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    <i class="fas fa-magic"></i>
+                    <span>Extract Text</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Loading indicator -->
+        <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+            <div class="spinner"></div>
+            <p>Processing your PDF... This may take up to 2 minutes for large files.</p>
+            <div class="progress-info">
+                <p><i class="fas fa-info-circle"></i> OCR processing can take 30-120 seconds depending on file size</p>
+                <p><i class="fas fa-clock"></i> Please keep this page open during processing</p>
+            </div>
+        </div>
+
+        <!-- Results section -->
+        {% if result %}
+        <div class="results-section">
+            <h2><i class="fas fa-check-circle"></i> Extraction Results</h2>
+            
+            <!-- Extracted Text -->
+            <div class="result-card">
+                <h3><i class="fas fa-text-width"></i> Extracted Text</h3>
+                <div class="text-output">
+                    <textarea readonly>{{ result.extracted_text }}</textarea>
+                    <button class="copy-btn" onclick="copyToClipboard('extractedText')">
+                        <i class="fas fa-copy"></i> Copy Text
+                    </button>
+                </div>
+            </div>
+
+            <!-- Detailed Results -->
+            <div class="result-card">
+                <h3><i class="fas fa-code"></i> Detailed OCR Results (JSON)</h3>
+                <div class="json-output">
+                    <pre><code id="detailedResults">{{ result.detailed_results }}</code></pre>
+                    <button class="copy-btn" onclick="copyToClipboard('detailedResults')">
+                        <i class="fas fa-copy"></i> Copy JSON
+                    </button>
+                </div>
+            </div>
+
+            <!-- Processing Statistics -->
+            <div class="result-card">
+                <h3><i class="fas fa-chart-bar"></i> Processing Statistics</h3>
+                <div class="stats-output">
+                    <pre>{{ result.processing_stats }}</pre>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- API Status -->
+        <div class="status-section">
+            {% if api_available %}
+                <div class="status-badge success">
+                    <i class="fas fa-check"></i>
+                    <span>OCR API Available</span>
+                </div>
+            {% else %}
+                <div class="status-badge error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>OCR API Unavailable</span>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for message in messages %}
+                        <div class="flash-message error">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <span>{{ message }}</span>
+                            {% if "timeout" in message.lower() or "connection" in message.lower() %}
+                                <button class="retry-btn" onclick="retryProcessing()">
+                                    <i class="fas fa-redo"></i> Try Again
+                                </button>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <script>
+        // File input handling
+        const fileInput = document.getElementById('fileInput');
+        const fileLabel = document.querySelector('.file-input-label');
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const uploadForm = document.getElementById('uploadForm');
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                fileLabel.querySelector('.file-text').textContent = file.name;
+                fileLabel.querySelector('.file-info').textContent = `${(file.size / 1024 / 1024).toFixed(2)} MB`;
+            }
+        });
+
+        // Form submission with loading indicator
+        uploadForm.addEventListener('submit', function(e) {
+            const file = fileInput.files[0];
+            if (!file) {
+                e.preventDefault();
+                alert('Please select a PDF file first.');
+                return;
+            }
+            
+            if (file.size > 16 * 1024 * 1024) {
+                e.preventDefault();
+                alert('File size exceeds 16MB limit.');
+                return;
+            }
+
+            // Show loading indicator
+            loadingIndicator.style.display = 'block';
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            
+            // Add timeout warning after 30 seconds
+            setTimeout(() => {
+                if (loadingIndicator.style.display !== 'none') {
+                    const progressInfo = document.querySelector('.progress-info');
+                    if (progressInfo) {
+                        progressInfo.innerHTML += '<p style="color: #ff6b6b;"><i class="fas fa-exclamation-triangle"></i> Processing is taking longer than expected. Please wait...</p>';
+                    }
+                }
+            }, 30000);
+        });
+
+        // Copy to clipboard function
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent || element.value;
+            
+            navigator.clipboard.writeText(text).then(function() {
+                // Show success feedback
+                const btn = event.target.closest('.copy-btn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                btn.style.background = '#28a745';
+                
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.style.background = '';
+                }, 2000);
+            }).catch(function(err) {
+                alert('Failed to copy text: ' + err);
+            });
+        }
+
+        // Drag and drop functionality
+        const fileWrapper = document.querySelector('.file-input-wrapper');
+        
+        fileWrapper.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            fileWrapper.classList.add('dragover');
+        });
+        
+        fileWrapper.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            fileWrapper.classList.remove('dragover');
+        });
+        
+        fileWrapper.addEventListener('drop', function(e) {
+            e.preventDefault();
+            fileWrapper.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                fileInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        // Retry processing function
+        function retryProcessing() {
+            // Reset form state
+            loadingIndicator.style.display = 'none';
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-magic"></i><span>Extract Text</span>';
+            
+            // Clear any flash messages
+            const flashMessages = document.querySelector('.flash-messages');
+            if (flashMessages) {
+                flashMessages.remove();
+            }
+            
+            // Focus on file input
+            fileInput.focus();
+        }
+    </script>
+</body>
+</html>
