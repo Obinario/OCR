@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+PSAU OCR Service - API-based OCR with ML Classification
+A comprehensive document processing system that combines API-based OCR with intelligent ML classification.
+"""
+
 from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
 from werkzeug.utils import secure_filename
 import os
@@ -8,13 +14,17 @@ import time
 import concurrent.futures
 from contextlib import contextmanager
 from ml_classifier import MLClassifier
+import logging
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize Flask app
 app = Flask(__name__)
 
-# Use a random or secret key (not your HF token!)
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecretkey123")
-
 # Configuration
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "supersecretkey123")
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf'}
 MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB max file size
@@ -25,89 +35,31 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Initialize the OCR API client using Hugging Face token from environment
 try:
-    HF_TOKEN = os.getenv("HF_API_TOKEN")  # ✅ Use Render environment variable
+    HF_TOKEN = os.getenv("HF_API_TOKEN")
     if not HF_TOKEN:
-        raise ValueError("Missing Hugging Face API token. Set HF_API_TOKEN in Render Environment Variables.")
+        raise ValueError("Missing Hugging Face API token. Set HF_API_TOKEN in environment variables.")
 
     # Initialize Gradio client securely
     ocr_client = Client("markobinario/OCRapi", hf_token=HF_TOKEN)
     api_available = True
+    logger.info("✅ OCR API client initialized successfully!")
 except Exception as e:
-    print(f"Warning: Could not initialize OCR API client: {e}")
+    logger.warning(f"Could not initialize OCR API client: {e}")
     ocr_client = None
     api_available = False
 
-# Initialize ML Classifier with Auto-Training
-def initialize_ml_classifier():
-    """Initialize ML classifier with auto-training fallback"""
-    try:
-        ml_classifier = MLClassifier()
-        ml_available = ml_classifier.is_model_available()
-        
-        if ml_available:
-            print("ML Classifier initialized successfully!")
-            return ml_classifier, ml_available
-        else:
-            print("ML Classifier initialized but model not available")
-            return None, False
-            
-    except Exception as e:
-        print(f"Warning: Could not initialize ML Classifier: {e}")
-        return None, False
-
-def run_auto_training():
-    """Run auto-training and return new classifier"""
-    try:
-        print("Running auto-training...")
-        from auto_train import AutoTrainer
-        trainer = AutoTrainer()
-        
-        if trainer.auto_train(force_retrain=True):
-            print("Auto-training completed! Creating new ML classifier...")
-            
-            # Copy trained models to root directory
-            import shutil
-            try:
-                shutil.copy('models/auto_report_card_model.pkl', 'report_card_model.pkl')
-                shutil.copy('models/auto_vectorizer.pkl', 'vectorizer.pkl')
-                print("Models copied to root directory")
-            except Exception as copy_error:
-                print(f"Warning: Could not copy models: {copy_error}")
-            
-            # Create new classifier
-            ml_classifier = MLClassifier()
-            ml_available = ml_classifier.is_model_available()
-            
-            if ml_available:
-                print("ML Classifier initialized successfully after auto-training!")
-                return ml_classifier, ml_available
-            else:
-                print("ML Classifier still not available after auto-training")
-                return None, False
-        else:
-            print("Auto-training failed")
-            return None, False
-            
-    except Exception as train_error:
-        print(f"Auto-training failed: {train_error}")
-        return None, False
-
-# Initialize ML Classifier with Continuous Auto-Training
-print("Initializing ML Classifier...")
-
-# Always run auto-training to improve accuracy
-print("Running auto-training to improve model accuracy...")
-ml_classifier, ml_available = run_auto_training()
-
-# If auto-training failed, try to load existing models
-if not ml_available:
-    print("Auto-training failed, trying to load existing models...")
-    ml_classifier, ml_available = initialize_ml_classifier()
-
-# Final fallback
-if not ml_available:
-    print("ML Classifier not available after all attempts")
+# Initialize ML Classifier
+try:
+    ml_classifier = MLClassifier()
+    ml_available = ml_classifier.is_model_available()
+    if ml_available:
+        logger.info("✅ ML Classifier loaded successfully!")
+    else:
+        logger.warning("⚠️ ML Classifier not available - run 'python auto_train.py' to train the model")
+except Exception as e:
+    logger.warning(f"Could not initialize ML Classifier: {e}")
     ml_classifier = None
+    ml_available = False
 
 
 def allowed_file(filename):
@@ -132,7 +84,7 @@ def process_pdf_with_ocr(file_path):
             return None, "OCR API is not available. Please check your configuration or internet connection."
 
         def ocr_process():
-            # You may need to adjust api_name depending on your Hugging Face Space setup
+            # Use the Hugging Face OCR API
             return ocr_client.predict(
                 pdf_file=handle_file(file_path),
                 api_name="/predict_1"
@@ -145,8 +97,8 @@ def process_pdf_with_ocr(file_path):
         detailed_results = result[1] if len(result) > 1 else "{}"
         processing_stats = result[2] if len(result) > 2 else ""
 
-        # Prepare OCR results for ML classification
-        ocr_results = {
+        # Prepare result dictionary
+        result_dict = {
             'extracted_text': extracted_text,
             'detailed_results': detailed_results,
             'processing_stats': processing_stats,
@@ -156,29 +108,34 @@ def process_pdf_with_ocr(file_path):
         # Add ML classification if available
         if ml_available and ml_classifier and extracted_text:
             try:
-                # Convert extracted text to format expected by ML classifier
-                texts_for_classification = [{'text': extracted_text, 'confidence': 100.0}]
+                # Convert extracted text to the format expected by ML classifier
+                texts = [{'text': extracted_text, 'confidence': 100.0}]
                 
                 # Classify the document
-                classification = ml_classifier.classify_text(texts_for_classification)
-                ocr_results['classification'] = classification
+                prediction = ml_classifier.classify_text(texts)
+                result_dict['prediction'] = prediction
                 
                 # If it's a report card, verify pass/fail status
-                if classification == "Report Card":
-                    status_info = ml_classifier.verify_report_card_status(texts_for_classification)
-                    ocr_results['status_info'] = status_info
+                if prediction == "Report Card":
+                    status_info = ml_classifier.verify_report_card_status(texts)
+                    result_dict['status_info'] = status_info
+                    result_dict['is_report_card'] = True
+                    result_dict['has_failed_remarks'] = status_info.get('status') == 'failed' if status_info else False
                 else:
-                    ocr_results['status_info'] = {"status": "not_applicable", "message": "Not a report card"}
+                    result_dict['is_report_card'] = False
+                    result_dict['has_failed_remarks'] = False
                     
             except Exception as e:
-                print(f"Warning: ML classification failed: {e}")
-                ocr_results['classification'] = "Classification Error"
-                ocr_results['status_info'] = {"status": "error", "message": f"Classification error: {str(e)}"}
+                logger.warning(f"ML classification failed: {e}")
+                result_dict['prediction'] = "Classification Error"
+                result_dict['is_report_card'] = False
+                result_dict['has_failed_remarks'] = False
         else:
-            ocr_results['classification'] = "ML Not Available"
-            ocr_results['status_info'] = {"status": "unavailable", "message": "ML classification not available"}
+            result_dict['prediction'] = "ML Not Available"
+            result_dict['is_report_card'] = False
+            result_dict['has_failed_remarks'] = False
 
-        return ocr_results, None
+        return result_dict, None
 
     except TimeoutError:
         return None, f"OCR processing timed out after {OCR_TIMEOUT} seconds. The PDF might be too large or complex."
@@ -189,7 +146,7 @@ def process_pdf_with_ocr(file_path):
 @app.route('/')
 def index():
     """Main page with file upload form."""
-    return render_template('index.html', api_available=api_available, ml_available=ml_available)
+    return render_template('index.html', api_available=api_available)
 
 
 @app.route('/upload', methods=['POST'])
@@ -208,7 +165,7 @@ def upload_file():
         flash('Invalid file type. Please upload a PDF file.')
         return redirect(request.url)
 
-    # Render doesn't automatically provide file size, so we manually check
+    # Check file size
     file.seek(0, os.SEEK_END)
     file_length = file.tell()
     file.seek(0)
@@ -224,7 +181,7 @@ def upload_file():
 
         result, error = process_pdf_with_ocr(file_path)
 
-        # Clean up
+        # Clean up uploaded file
         try:
             os.remove(file_path)
         except:
@@ -234,7 +191,7 @@ def upload_file():
             flash(f'Error: {error}')
             return redirect(url_for('index'))
 
-        return render_template('index.html', result=result, api_available=api_available, ml_available=ml_available)
+        return render_template('index.html', result=result, api_available=api_available)
 
     except Exception as e:
         flash(f'Error processing file: {str(e)}')
@@ -252,5 +209,56 @@ def health_check():
     })
 
 
+@app.route('/api/classify', methods=['POST'])
+def api_classify():
+    """API endpoint for document classification."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({"success": False, "error": "No file uploaded"})
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"success": False, "error": "No file selected"})
+        
+        if not allowed_file(file.filename):
+            return jsonify({"success": False, "error": "Invalid file type"})
+        
+        # Save uploaded file temporarily
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(file_path)
+        
+        # Process the document
+        result, error = process_pdf_with_ocr(file_path)
+        
+        # Clean up
+        try:
+            os.remove(file_path)
+        except:
+            pass
+        
+        if error:
+            return jsonify({"success": False, "error": error})
+        
+        # Return API response
+        return jsonify({
+            "success": True,
+            "prediction": result.get('prediction', 'Unknown'),
+            "is_report_card": result.get('is_report_card', False),
+            "has_failed_remarks": result.get('has_failed_remarks', False),
+            "status_info": result.get('status_info'),
+            "extracted_text": result.get('extracted_text', ''),
+            "processing_stats": result.get('processing_stats', '')
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in API classify: {str(e)}")
+        return jsonify({"success": False, "error": f"Error processing document: {str(e)}"})
+
+
 if __name__ == '__main__':
+    logger.info("Starting PSAU OCR Service...")
+    logger.info(f"OCR API Available: {api_available}")
+    logger.info(f"ML Classification Available: {ml_available}")
+    logger.info("Service ready at http://localhost:5000")
     app.run(debug=True, host='0.0.0.0', port=5000)
