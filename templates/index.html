@@ -63,33 +63,6 @@
                 </div>
             </div>
 
-            <!-- ML Classification Results -->
-            {% if result.prediction %}
-            <div class="result-card">
-                <h3><i class="fas fa-brain"></i> Document Classification</h3>
-                <div class="classification-output">
-                    <div class="classification-item">
-                        <strong>Document Type:</strong> 
-                        <span class="prediction-badge {% if result.is_report_card %}report-card{% else %}not-report-card{% endif %}">
-                            {{ result.prediction }}
-                        </span>
-                    </div>
-                    
-                    {% if result.is_report_card and result.status_info %}
-                    <div class="classification-item">
-                        <strong>Status:</strong> 
-                        <span class="status-badge {% if result.has_failed_remarks %}failed{% else %}passed{% endif %}">
-                            {% if result.has_failed_remarks %}Failed{% else %}Passed{% endif %}
-                        </span>
-                    </div>
-                    <div class="classification-item">
-                        <strong>Details:</strong> {{ result.status_info.message }}
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-            {% endif %}
-
             <!-- Detailed Results -->
             <div class="result-card">
                 <h3><i class="fas fa-code"></i> Detailed OCR Results (JSON)</h3>
