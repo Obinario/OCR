@@ -1,2 +1,0 @@
-INVOICE Invoice Number: INV-5223-869 Date: 1975-07-13 Bill To: Nguyen and Sons Address: 640 Ellen Shore
-New Kimberlyville, LA 87973 Items Description Quantity Price Total Office Supplies 17 $11.00 $131.00 Software License 1 $463.00 $430.00 Total Amount: $755.00 Payment Due: 2025-10-15
